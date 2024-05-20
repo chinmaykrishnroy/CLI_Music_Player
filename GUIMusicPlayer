@@ -1,0 +1,137 @@
+import os
+import pygame
+import tkinter as tk
+from tkinter import filedialog, messagebox
+
+class MusicPlayer:
+    def __init__(self, master):
+        self.master = master
+        self.master.title("Media Player")
+        self.master.configure(bg="black")
+        self.master.geometry("800x100")
+        self.master.resizable(False, False)
+        
+        self.master.overrideredirect(True)  # Hide default window decorations
+        
+        self.music_frame = tk.Frame(self.master, bg="white", bd=0, highlightthickness=0)
+        self.music_frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+        self.music_frame.config(width=800, height=100)
+        
+        button_y_position = 0.7
+        
+        self.progress_bar = tk.Canvas(self.music_frame, bg="white", highlightthickness=0)
+        self.progress_bar.place(relx=0.05, rely=0.1, relwidth=0.9, relheight=0.02)
+        
+        self.current_time_label = tk.Label(self.music_frame, text="00:00", font=("Montserrat", 10), bg="white", fg="black")
+        self.current_time_label.place(relx=0.05, rely=0.35)
+        
+        self.total_time_label = tk.Label(self.music_frame, text="00:00", font=("Montserrat", 10), bg="white", fg="black")
+        self.total_time_label.place(relx=0.9, rely=0.35, anchor=tk.NE)
+        
+        self.select_button = tk.Button(self.music_frame, text="File", bd=0, command=self.select_media, bg="white", fg="black")
+        self.select_button.place(relx=0.05, rely=button_y_position)
+        
+        self.prev_button = tk.Button(self.music_frame, text="Prev", bd=0, command=self.play_previous, bg="white", fg="black")
+        self.prev_button.place(relx=0.25, rely=button_y_position)
+        
+        self.play_pause_button = tk.Button(self.music_frame, text="P", bd=0, command=self.play_pause, bg="white", fg="black")
+        self.play_pause_button.place(relx=0.45, rely=button_y_position)
+        
+        self.next_button = tk.Button(self.music_frame, text="Nxt", bd=0, command=self.play_next, bg="white", fg="black")
+        self.next_button.place(relx=0.65, rely=button_y_position)
+        
+        self.eq_button = tk.Button(self.music_frame, text="Eq", bd=0, bg="white", fg="black")
+        self.eq_button.place(relx=0.85, rely=button_y_position)
+        
+        self.close_button = tk.Button(self.music_frame, text="B", bd=0, command=self.close_app, bg="black", fg="white")
+        self.close_button.place(relx=0.02, rely=0.02, anchor=tk.NW)
+
+        pygame.mixer.init()
+        self.playing = False
+        self.current_song = None
+        self.playlist = []
+        self.current_index = -1
+
+    def select_media(self):
+        try:
+            folder_path = filedialog.askdirectory()
+            if folder_path:
+                self.playlist = [os.path.join(folder_path, file) for file in os.listdir(folder_path) if file.endswith('.mp3')]
+                if self.playlist:
+                    self.current_index = 0
+                    self.load_and_play()
+                else:
+                    messagebox.showinfo("Info", "No mp3 files found in selected folder.")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def load_and_play(self):
+        if self.playlist:
+            if self.current_index >= 0 and self.current_index < len(self.playlist):
+                self.current_song = self.playlist[self.current_index]
+                pygame.mixer.music.load(self.current_song)
+                pygame.mixer.music.play()
+                self.playing = True
+                self.update_time()
+            else:
+                messagebox.showinfo("Info", "No more songs in the playlist.")
+                self.current_song = None
+                self.playing = False
+
+    def play_pause(self):
+        if self.playing:
+            pygame.mixer.music.pause()
+            self.playing = False
+        else:
+            pygame.mixer.music.unpause()
+            self.playing = True
+
+    def play_previous(self):
+        if self.playlist:
+            if self.current_index > 0:
+                self.current_index -= 1
+                self.load_and_play()
+
+    def play_next(self):
+        if self.playlist:
+            if self.current_index < len(self.playlist) - 1:
+                self.current_index += 1
+                self.load_and_play()
+
+    def update_time(self):
+        try:
+            if self.current_song:
+                total_length = pygame.mixer.Sound(self.current_song).get_length()
+                minutes, seconds = divmod(total_length, 60)
+                total_time_str = "{:02d}:{:02d}".format(int(minutes), int(seconds))
+                self.total_time_label.config(text=total_time_str)
+                
+                while pygame.mixer.music.get_busy() and self.playing:
+                    current_time = pygame.mixer.music.get_pos() / 1000
+                    minutes, seconds = divmod(current_time, 60)
+                    current_time_str = "{:02d}:{:02d}".format(int(minutes), int(seconds))
+                    self.current_time_label.config(text=current_time_str)
+                    
+                    # Update progress bar
+                    progress_width = current_time / total_length * 0.9 * 800
+                    self.progress_bar.delete("progress")
+                    self.progress_bar.create_rectangle(0, 0, progress_width, 2, fill="white", tags="progress")
+                    
+                    self.master.update()
+                    
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            self.playing = False
+
+        self.master.after(1000, self.update_time)
+    
+    def close_app(self):
+        self.master.destroy()
+
+def main():
+    root = tk.Tk()
+    app = MusicPlayer(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
